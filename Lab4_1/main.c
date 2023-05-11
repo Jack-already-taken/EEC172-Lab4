@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
+#include <stdbool.h>
 
 // Driverlib includes
 #include "hw_types.h"
@@ -40,6 +41,7 @@
 #include "uart_if.h"
 #include "uart.h"
 #include "timer_if.h"
+#include "timer.h"
 
 // Pin configurations
 #include "pin_mux_config.h"
@@ -109,8 +111,10 @@ int start  = 0;
 char  prevLetter = '/';
 char buffer[32];
 int bufIndex = 0;
+volatile unsigned char RxBuffer[2];
+volatile unsigned char TxBuffer[2];
 
-int N = 410;                 // block size
+const int N = 410;                 // block size
 volatile int samples[N];   // buffer to store N samples
 volatile int sampleIndex = 0;
 volatile int count;         // samples count
@@ -163,8 +167,7 @@ static void BoardInit(void);
 //*****************************************************************************
 
 //-------Goertzel function---------------------------------------//
-long int
-goertzel (int sample[], long int coeff, int N)
+long int goertzel (int sample[], long int coeff, int N)
 //---------------------------------------------------------------//
 {
     //initialize variables to be used in the function
@@ -191,16 +194,6 @@ goertzel (int sample[], long int coeff, int N)
     power = ((prod1 + prod2 - prod3)) >> 8;   //calculate power using the three products and scale the result down
 
     return power;
-}
-
-void TimerBaseIntHandler(void)
-{
-    //
-    // Clear the timer interrupt.
-    //
-    Timer_IF_InterruptClear(g_ulBase);
-
-
 }
 
 // Displays Message According to the Button Pressed
@@ -448,9 +441,27 @@ void TimerBaseIntHandler(void)
     // Clear the timer interrupt.
     //
     Timer_IF_InterruptClear(g_ulBase);
+    // CS Low
+    GPIOPinWrite(GPIOA2_BASE, 0x80, 0);
 
-    g_ulTimerInts ++;
-    GPIO_IF_LedToggle(MCU_GREEN_LED_GPIO);
+    MAP_SPITransfer(GSPI_BASE, TxBuffer, RxBuffer, 2, SPI_CS_ENABLE|SPI_CS_DISABLE);
+    // CS High
+    GPIOPinWrite(GPIOA2_BASE, 0x80, 0);
+
+    // Process Data
+    uint16_t data = RxBuffer[1];
+    data = data << 8;
+    data = data | RxBuffer[0];
+    data = data & 0x1FF8;
+    data = data >> 3;
+    samples[sampleIndex++] = data;
+
+    // Disable Timer Interrupt
+    if (sampleIndex == N) {
+        MAP_TimerDisable(g_ulBase,TIMER_A);
+        sampleReady = 1;
+        sampleIndex = 0;
+    }
 }
 
 /**
@@ -651,7 +662,7 @@ int main() {
     //
     Timer_IF_Init(PRCM_TIMERA0, g_ulBase, TIMER_CFG_PERIODIC, TIMER_A, 0);
     Timer_IF_IntSetup(g_ulBase, TIMER_A, TimerBaseIntHandler);
-    MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / );
+    MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
     //
     // Enable the GPT
     //
@@ -700,7 +711,7 @@ int main() {
     prevButton = -1;
     char letter;
     //uint64_t delta, delta_us;
-
+    int i;
     for (i = 0; i < 8; i++)
       {
         coeff[i] = (2 * cos (2 * M_PI * (f_tone[i] / 9615.0))) * (1 << 14);
@@ -709,7 +720,20 @@ int main() {
 
 
     while (1) {
-        while(SW_intflag == 0){;}
+        while(sampleReady == 0){;}
+        int i;
+        for (i = 0; i < 410; i+=50) {
+            Report("Data: %c \n\r", samples[i]);
+        }
+
+        MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+        sampleReady = 0;
+
+
+
+
+
+        /*
         DisplayButtonPressed(data);
         prevData = data;
         letter = firstLetter(prevData);
@@ -767,6 +791,8 @@ int main() {
 
         // Saves New Button Information
         prevButton = currButton;
+        */
+
     }
 }
 
