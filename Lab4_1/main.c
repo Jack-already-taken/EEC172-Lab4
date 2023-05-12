@@ -118,7 +118,7 @@ const int N = 410;                 // block size
 volatile int samples[N];   // buffer to store N samples
 volatile int sampleIndex = 0;
 volatile int count;         // samples count
-volatile bool sampleReady;         // flag set when the samples buffer is full with N samples
+volatile bool sampleReady = 0;         // flag set when the samples buffer is full with N samples
 volatile bool new_dig;      // flag set when inter-digit interval (pause) is detected
 
 int power_all[8];       // array to store calculated power of 8 frequencies
@@ -155,7 +155,7 @@ typedef struct PinSetting {
     unsigned int pin;
 } PinSetting;
 
-static PinSetting button = { .port = GPIOA0_BASE, .pin = 0x80};
+//static PinSetting button = { .port = GPIOA0_BASE, .pin = 0x80};
 
 //*****************************************************************************
 //                      LOCAL FUNCTION PROTOTYPES
@@ -446,7 +446,7 @@ void TimerBaseIntHandler(void)
 
     MAP_SPITransfer(GSPI_BASE, TxBuffer, RxBuffer, 2, SPI_CS_ENABLE|SPI_CS_DISABLE);
     // CS High
-    GPIOPinWrite(GPIOA2_BASE, 0x80, 0);
+    GPIOPinWrite(GPIOA2_BASE, 0x80, 0x80);
 
     // Process Data
     uint16_t data = RxBuffer[1];
@@ -586,7 +586,7 @@ static void SPI_Communication(void){
     Adafruit_Init();
 //    delay(100);
 }
-
+/*
 static void GPIOA2IntHandler(void) {    // SW2 handler
 
     if (first_edge) {
@@ -638,6 +638,7 @@ static void GPIOA2IntHandler(void) {    // SW2 handler
     MAP_GPIOIntClear(button.port, ulStatus);       // clear interrupts on GPIOA2
 
 }
+*/
 //****************************************************************************
 //
 //! Main function
@@ -656,18 +657,6 @@ int main() {
     
     UART_Communication();
 
-    g_ulBase = TIMERA0_BASE;
-    //
-    // Configuring the timer
-    //
-    Timer_IF_Init(PRCM_TIMERA0, g_ulBase, TIMER_CFG_PERIODIC, TIMER_A, 0);
-    Timer_IF_IntSetup(g_ulBase, TIMER_A, TimerBaseIntHandler);
-    MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
-    //
-    // Enable the GPT
-    //
-    MAP_TimerEnable(g_ulBase,TIMER_A);
-
     // Initialize UART Terminal
     InitTerm();
 
@@ -677,9 +666,18 @@ int main() {
     // Set SPI
     SPI_Communication();
 
+    g_ulBase = TIMERA0_BASE;
+    //
+    // Configuring the timer
+    //
+    Timer_IF_Init(PRCM_TIMERA0, g_ulBase, TIMER_CFG_PERIODIC, TIMER_A, 0);
+    Timer_IF_IntSetup(g_ulBase, TIMER_A, TimerBaseIntHandler);
+    MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+
     //
     // Register the interrupt handlers
     //
+    /*
     MAP_GPIOIntRegister(button.port, GPIOA2IntHandler);
 
     //
@@ -698,6 +696,7 @@ int main() {
 
     // Enable SW2 and SW3 interrupts
     MAP_GPIOIntEnable(button.port, button.pin);
+    */
 
     Message("\t\t****************************************************\n\r");
     Message("\t\t\t\tSystick Example\n\r\n\r");
@@ -717,16 +716,20 @@ int main() {
         coeff[i] = (2 * cos (2 * M_PI * (f_tone[i] / 9615.0))) * (1 << 14);
       }               // calculate coeff at each frquency - Q15 format
 
-
+    //
+    // Enable the GPT
+    //
+    MAP_TimerEnable(g_ulBase,TIMER_A);
 
     while (1) {
         while(sampleReady == 0){;}
         int i;
-        for (i = 0; i < 410; i+=50) {
-            Report("Data: %c \n\r", samples[i]);
+        for (i = 0; i < 410; i+=20) {
+            Report("Data: %d \n\r", samples[i]);
         }
 
         MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+        MAP_TimerEnable(g_ulBase,TIMER_A);
         sampleReady = 0;
 
 
