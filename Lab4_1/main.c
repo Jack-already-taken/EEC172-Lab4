@@ -669,8 +669,8 @@ char ADCDecoder()
     }
 
 //    if(power_all[col] >  && power_all[row] > )
-        
-    
+
+
     if(power_all[col] > 1000 && power_all[row] > 1000)
     {
         //char button = frequency[row][col-4];
@@ -763,21 +763,28 @@ int main() {
 
     while (1) {
         while(sampleReady == 0){;}
+        /*
         int i;
         for (i = 0; i < 410; i+=20) {
             Report("Data: %d \n\r", samples[i]);
         }
+        */
+
 
 
         //Called every 5000 ticks
         //if(sampleCount == 410)
         //{
             // disable timer
+        int i;
+        for(i = 0; i < 8; i++)
+            power_all[i] = goertzel(samples, coeff[i], 410);
 
-            for(i = 0; i < 8; i++)
-                power_all[i] = goertzel(samples, coeff[i], 410);
+        for (i = 0; i < 8; i++) {
+            Report("Frequency: %d \t Strength: %d \n\r", f_tone[i], samples[i]);
+        }
 
-            ADCDecoder();
+        ADCDecoder();
             //sampleCount = 0;
 
             // reenable timer
