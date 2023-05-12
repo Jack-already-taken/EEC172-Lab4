@@ -72,6 +72,11 @@ int track = 0;
 #define YELLOW          0xFFE0
 #define WHITE           0xFFFF
 
+char frequency[4][3] = {{'1', '2', '3'},
+                        {'4', '5', '6'},
+                        {'7', '8', '9'},
+                        {'*', '0', '#'}};
+
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- Start
 //*****************************************************************************
@@ -442,11 +447,11 @@ void TimerBaseIntHandler(void)
     //
     Timer_IF_InterruptClear(g_ulBase);
     // CS Low
-    GPIOPinWrite(GPIOA2_BASE, 0x80, 0);
+    GPIOPinWrite(GPIOA0_BASE, 0x80, 0);
 
     MAP_SPITransfer(GSPI_BASE, TxBuffer, RxBuffer, 2, SPI_CS_ENABLE|SPI_CS_DISABLE);
     // CS High
-    GPIOPinWrite(GPIOA2_BASE, 0x80, 0x80);
+    GPIOPinWrite(GPIOA0_BASE, 0x80, 0x80);
 
     // Process Data
     uint16_t data = RxBuffer[1];
@@ -639,12 +644,47 @@ static void GPIOA2IntHandler(void) {    // SW2 handler
 
 }
 */
+char ADCDecoder()
+{
+    int maxPower = 0;
+    int i, row, col;
+    for(i = 0; i < 4; i++)
+    {
+        if(power_all[i] > maxPower)
+        {
+            maxPower = power_all[i];
+            row = i;
+        }
+    }
+
+    maxPower = 0;
+
+    for(i = 4; i < 7; i++)
+    {
+        if(power_all[i] > maxPower)
+        {
+            maxPower = power_all[i];
+            col = i;
+        }
+    }
+
+//    if(power_all[col] >  && power_all[row] > )
+        
+    
+    if(power_all[col] > 1000 && power_all[row] > 1000)
+    {
+        //char button = frequency[row][col-4];
+        Report("%c was pressed\n\r", frequency[row][col-4]);
+        //return button;
+    }
+}
+
 //****************************************************************************
 //
 //! Main function
 //!
 //! \param none
-//! 
+//!
 //!
 //! \return None.
 //
@@ -652,9 +692,9 @@ static void GPIOA2IntHandler(void) {    // SW2 handler
 int main() {
 
     BoardInit();
-    
+
     PinMuxConfig();
-    
+
     UART_Communication();
 
     // Initialize UART Terminal
@@ -708,7 +748,7 @@ int main() {
     prevData = 1;
     currButton = -2;
     prevButton = -1;
-    char letter;
+    //char letter;
     //uint64_t delta, delta_us;
     int i;
     for (i = 0; i < 8; i++)
@@ -728,6 +768,22 @@ int main() {
             Report("Data: %d \n\r", samples[i]);
         }
 
+
+        //Called every 5000 ticks
+        //if(sampleCount == 410)
+        //{
+            // disable timer
+
+            for(i = 0; i < 8; i++)
+                power_all[i] = goertzel(samples, coeff[i], 410);
+
+            ADCDecoder();
+            //sampleCount = 0;
+
+            // reenable timer
+        //    MAP_TimerLoadSet(g_ulBase, TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+        //    sampleReady = 0;
+        //}
         MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
         MAP_TimerEnable(g_ulBase,TIMER_A);
         sampleReady = 0;
