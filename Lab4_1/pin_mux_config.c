@@ -36,7 +36,7 @@
 //
 //*****************************************************************************
 
-// This file was automatically generated on 5/12/2023 at 10:52:15 AM
+// This file was automatically generated on 5/12/2023 at 10:19:45 AM
 // by TI PinMux version 4.0.1543 
 //
 //*****************************************************************************
@@ -64,7 +64,6 @@ void PinMuxConfig(void)
     PinModeSet(PIN_15, PIN_MODE_0);
     PinModeSet(PIN_21, PIN_MODE_0);
     PinModeSet(PIN_45, PIN_MODE_0);
-    PinModeSet(PIN_50, PIN_MODE_0);
     PinModeSet(PIN_52, PIN_MODE_0);
     PinModeSet(PIN_53, PIN_MODE_0);
     PinModeSet(PIN_60, PIN_MODE_0);
@@ -83,10 +82,10 @@ void PinMuxConfig(void)
     PRCMPeripheralClkEnable(PRCM_UARTA1, PRCM_RUN_MODE_CLK);
 
     //
-    // Configure PIN_62 for GPIO Input
+    // Configure PIN_62 for GPIO Output
     //
     PinTypeGPIO(PIN_62, PIN_MODE_0, false);
-    GPIODirModeSet(GPIOA0_BASE, 0x80, GPIO_DIR_MODE_IN);
+    GPIODirModeSet(GPIOA0_BASE, 0x80, GPIO_DIR_MODE_OUT);
 
     //
     // Configure PIN_64 for GPIO Output
@@ -105,6 +104,11 @@ void PinMuxConfig(void)
     //
     PinTypeGPIO(PIN_18, PIN_MODE_0, false);
     GPIODirModeSet(GPIOA3_BASE, 0x10, GPIO_DIR_MODE_OUT);
+
+    //
+    // Configure PIN_50 for SPI0 GSPI_CS
+    //
+    PinTypeSPI(PIN_50, PIN_MODE_9);
 
     //
     // Configure PIN_05 for SPI0 GSPI_CLK
