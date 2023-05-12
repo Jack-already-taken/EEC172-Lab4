@@ -753,7 +753,8 @@ int main() {
     int i;
     for (i = 0; i < 8; i++)
       {
-        coeff[i] = (2 * cos (2 * M_PI * (f_tone[i] / 9615.0))) * (1 << 14);
+        coeff[i] = (2 * cos (2 * M_PI * (f_tone[i] / 16000.0))) * (1 << 14);
+        //Report("%d \n\r", coeff[i]);
       }               // calculate coeff at each frquency - Q15 format
 
     //
@@ -763,12 +764,22 @@ int main() {
 
     while (1) {
         while(sampleReady == 0){;}
-        /*
-        int i;
-        for (i = 0; i < 410; i+=20) {
+
+        //int i;
+      /*  for (i = 0; i < 410; i+=20) {
             Report("Data: %d \n\r", samples[i]);
+        }*/
+        
+        int sum = 0;
+        for(i = 0; i < 410; i++){
+            sum += samples[i];
         }
-        */
+        sum = sum / 410;
+
+        for(i = 0; i < 410; i++)
+        {
+            samples[i] = samples[i] - sum;
+        }
 
 
 
@@ -776,12 +787,12 @@ int main() {
         //if(sampleCount == 410)
         //{
             // disable timer
-        int i;
+        //int i;
         for(i = 0; i < 8; i++)
             power_all[i] = goertzel(samples, coeff[i], 410);
 
         for (i = 0; i < 8; i++) {
-            Report("Frequency: %d \t Strength: %d \n\r", f_tone[i], samples[i]);
+           Report("Frequency: %d \t Strength: %d \t coeff:%d \t Power: %d \n\r", f_tone[i], samples[i], coeff[i], power_all[i]);
         }
 
         ADCDecoder();
