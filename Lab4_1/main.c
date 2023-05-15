@@ -47,18 +47,19 @@
 #include "pin_mux_config.h"
 
 
-#define B0      0b00000010111111010000000011111111
-#define B1      0b00000010111111011000000001111111
-#define B2      0b00000010111111010100000010111111
-#define B3      0b00000010111111011100000000111111
-#define B4      0b00000010111111010010000011011111
-#define B5      0b00000010111111011010000001011111
-#define B6      0b00000010111111010110000010011111
-#define B7      0b00000010111111011110000000011111
-#define B8      0b00000010111111010001000011101111
-#define B9      0b00000010111111011001000001101111
-#define MUTE    0b00000010111111010000100011110111
-#define LAST    0b00000010111111010000001011111101
+#define B0      '0'
+#define B1      '1'
+#define B2      '2'
+#define B3      '3'
+#define B4      '4'
+#define B5      '5'
+#define B6      '6'
+#define B7      '7'
+#define B8      '8'
+#define B9      '9'
+#define MUTE    '*'
+#define LAST    '#'
+#define NONE    'x'
 
 unsigned long data = 0;
 int track = 0;
@@ -120,16 +121,16 @@ volatile unsigned char RxBuffer[2];
 volatile unsigned char TxBuffer[2];
 
 const int N = 410;                 // block size
-volatile int samples[410];   // buffer to store N samples
+volatile int samples[N];   // buffer to store N samples
 volatile int sampleIndex = 0;
 volatile int count;         // samples count
 volatile bool sampleReady = 0;         // flag set when the samples buffer is full with N samples
 volatile bool new_dig;      // flag set when inter-digit interval (pause) is detected
 
-uint32_t power_all[7];       // array to store calculated power of 8 frequencies
+uint32_t power_all[8];       // array to store calculated power of 8 frequencies
 
-int coeff[7];           // array to store the calculated coefficients
-int f_tone[7] = { 697, 770, 852, 941, 1209, 1336, 1477};//, 1633 }; // frequencies of rows & columns
+int coeff[8];           // array to store the calculated coefficients
+int f_tone[8] = { 697, 770, 852, 941, 1209, 1336, 1477, 1633 }; // frequencies of rows & columns
 
 volatile long currButton;
 volatile long prevButton;
@@ -450,15 +451,14 @@ void TimerBaseIntHandler(void)
     GPIOPinWrite(GPIOA0_BASE, 0x80, 0);
 
     MAP_SPITransfer(GSPI_BASE, TxBuffer, RxBuffer, 2, SPI_CS_ENABLE|SPI_CS_DISABLE);
-
     // CS High
     GPIOPinWrite(GPIOA0_BASE, 0x80, 0x80);
 
     // Process Data
-    uint16_t data = RxBuffer[0]; //& 0x1F;
+    uint16_t data = RxBuffer[0];
     data = data << 8;
     data = data | RxBuffer[1];
-    data = data & 0x1FF8;//0xF8;
+    data = data & 0x1FF8;
     data = data >> 3;
     samples[sampleIndex++] = data;
 
@@ -590,12 +590,65 @@ static void SPI_Communication(void){
     MAP_SPIEnable(GSPI_BASE);
 
     Adafruit_Init();
+//    delay(100);
 }
+/*
+static void GPIOA2IntHandler(void) {    // SW2 handler
 
+    if (first_edge) {
+        SysTickReset();
+        first_edge = 0;
+    }
+    else {
+        // read the countdown register and compute elapsed cycles
+        uint64_t delta = SYSTICK_RELOAD_VAL - SysTickValueGet();
+
+        // convert elapsed cycles to microseconds
+        uint64_t delta_us = TICKS_TO_US(delta);
+
+        SysTickReset();
+
+        if (delta_us >= 35000)
+        {
+            SW_intcount = 0;
+        }else if (delta_us >= 2500 && delta_us < 35000)
+        { // Finds Start Time
+            data = 0;
+            SW_intcount = 1;
+        }if(delta_us > 1300 && delta_us < 2500)
+        {// Determines 1 bit
+            data = data << 1;
+            data = data + 1;
+        } else if(delta_us < 1300)
+        {// Determines 0 bit
+            data = data << 1;
+        }else if(delta_us > 2500)
+        {
+            data = 0;
+        }
+    }
+
+    SW_intcount++;
+
+
+    // Resets interrupt handle for next button pressed
+    if (SW_intcount == 34) {
+        SW_intcount = 0;
+        first_edge = 1;
+        SW_intflag = 1;
+    }
+
+    unsigned long ulStatus;
+
+    ulStatus = MAP_GPIOIntStatus (button.port, true);
+    MAP_GPIOIntClear(button.port, ulStatus);       // clear interrupts on GPIOA2
+
+}
+*/
 char ADCDecoder()
 {
     int maxPower = 0;
-    int i, row, col;
+    int i, row = 0, col = 0;
     for(i = 0; i < 4; i++)
     {
         if(power_all[i] > maxPower)
@@ -616,13 +669,40 @@ char ADCDecoder()
         }
     }
 
-    if(power_all[col] > 1000 && power_all[row] > 1000)
+//    if(power_all[col] >  && power_all[row] > )
+
+
+    if(power_all[col] > 50000 && power_all[row] > 50000)
     {
-        char button = frequency[row][col-4];
-        Report("%c was pressed\n\r", frequency[row][col-4]);
-        return button;
+        //char button = frequency[row][col-4];
+        return frequency[row][col-4];
+        //return button;
     }
-    return '/';
+    else {
+        return NONE;
+    }
+}
+
+void processSamples()
+{
+    int sum = 0, i;
+    for(i = 0; i < 410; i++){
+        sum += samples[i];
+    }
+    sum = sum / 410;
+
+    for(i = 0; i < 410; i++)
+    {
+        samples[i] = samples[i] - sum;
+    }
+
+    for(i = 0; i < 8; i++)
+        power_all[i] = goertzel(samples, coeff[i], 410);
+    /*
+    for (i = 0; i < 8; i++) {
+       Report("Frequency: %d \t Strength: %d \t coeff:%d \t Power: %d \n\r", f_tone[i], samples[i], coeff[i], power_all[i]);
+    }
+    */
 }
 
 //****************************************************************************
@@ -691,50 +771,58 @@ int main() {
     Message("\t\t****************************************************\n\r");
     Message("\n\n\n\r");
 
-    //prevData = 1;
-    //currButton = -2;
-    //prevButton = -1;
+    prevData = 1;
+    currButton = -2;
+    prevButton = -1;
     //char letter;
     //uint64_t delta, delta_us;
     int i;
-    for (i = 0; i < 7; i++)
-    {
-      coeff[i] = (2 * cos (2 * M_PI * (f_tone[i] / 16000.0))) * (1 << 14);
-    }      // calculate coeff at each frquency - Q15 format
+    for (i = 0; i < 8; i++)
+      {
+        coeff[i] = (2 * cos (2 * M_PI * (f_tone[i] / 16000.0))) * (1 << 14);
+        //Report("%d \n\r", coeff[i]);
+      }               // calculate coeff at each frquency - Q15 format
 
     //
     // Enable the GPT
     //
     MAP_TimerEnable(g_ulBase,TIMER_A);
-    char currButton;
+
     while (1) {
         while(sampleReady == 0){;}
 
-        /*for (i = 0; i < 410; i+=20) {
+        //int i;
+      /*  for (i = 0; i < 410; i+=20) {
             Report("Data: %d \n\r", samples[i]);
         }*/
 
-        long sum = 0;
-        for(i = 0; i < N; i++){
-            sum += samples[i];
-        }
-        sum = sum / N;
+        // Calculate DC offset
+        processSamples();
 
-        for(i = 0; i < N; i++){
-            samples[i] = samples[i] - sum;
+        char sampleResult = ADCDecoder();
+        Report("Button: %c \n\r", sampleResult);
+        /*
+        if (sampleResult != NONE) {
+            data = sampleResult;
+            while (sampleResult != NONE) {
+                MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+                MAP_TimerEnable(g_ulBase,TIMER_A);
+                sampleReady = 0;
+                while(sampleReady == 0){;}
+                processSamples();
+                sampleResult = ADCDecoder();
+            }
         }
+        */
 
-        for(i = 0; i < 7; i++){
-            power_all[i] = goertzel(samples, coeff[i], N);
-            Report("Frequency: %d \t Strength: %d \t coeff:%d \t Power: %d \n\r", f_tone[i], samples[i], coeff[i], power_all[i]);
-        }
-
-        ADCDecoder();
-        //sampleReady = 0;
         MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
         MAP_TimerEnable(g_ulBase,TIMER_A);
         sampleReady = 0;
-      
+
+
+
+
+
         /*
         DisplayButtonPressed(data);
         prevData = data;
