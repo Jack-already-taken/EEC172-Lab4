@@ -796,7 +796,7 @@ int main() {
     prevData = 1;
     currButton = -2;
     prevButton = -1;
-    //char letter;
+    char letter;
     //uint64_t delta, delta_us;
     int i;
     for (i = 0; i < 8; i++)
@@ -820,29 +820,28 @@ int main() {
         if (prevData != B0 && prevData != B1 && prevData != MUTE && prevData != LAST) {
             uint64_t timeInterval = 0;
             while (timeInterval++ < 3500000) {
-                if (SW_intflag) {
-                    // Determines if its the same button
-                    if(prevData == data)
-                    {
-                        sameButton = 1;
-                        currButton++;
-                    }
-                    else
-                        sameButton = 0;
-
-                    // Displays Letter
-                    if(sameButton)
-                    {
-                        letter = DisplayNextLetter(letter);
-                        timeInterval = 0;
-                    }
-                    else
-                    {
-                        SW_intflag = 1;
-                        break;
-                    }
-                    SW_intflag = 0;
+                // Determines if its the same button
+                buttonPress();
+                if(prevData == data)
+                {
+                    sameButton = 1;
+                    currButton++;
                 }
+                else
+                    sameButton = 0;
+
+                // Displays Letter
+                if(sameButton)
+                {
+                    letter = DisplayNextLetter(letter);
+                    timeInterval = 0;
+                }
+                else
+                {
+                    SW_intflag = 1;
+                    break;
+                }
+                SW_intflag = 0;
             }
         }
 
