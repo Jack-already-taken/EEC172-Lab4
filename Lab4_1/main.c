@@ -62,7 +62,9 @@
 #define NONE    'x'
 
 unsigned long data = 0;
+bool dataReady = 0;
 int track = 0;
+int color = 1;
 
 #define BLACK           0x0000
 #define BLUE            0x001F
@@ -115,7 +117,7 @@ volatile unsigned char SW_intflag;
 volatile int first_edge = 1;
 int start  = 0;
 char  prevLetter = '/';
-char buffer[32];
+char buffer[64];
 int bufIndex = 0;
 volatile unsigned char RxBuffer[2];
 volatile unsigned char TxBuffer[2];
@@ -244,7 +246,38 @@ void DisplayButtonPressed(unsigned long value)
             Report("Mute was pressed. \n\r");
             break;
         default:
-            Report("Error. Data = %d\n\r", data);
+
+            break;
+    }
+}
+
+// Depicts the Color of the Text
+void DisplayColor(void)
+{
+
+    if(color == 5)
+        color = 1;
+    else
+        color++;
+
+    switch(color)
+    {
+        case 1:
+            Report("Color is now: WHITE \n\r");
+            break;
+        case 2:
+            Report("Color is now: BLUE \n\r");
+            break;
+        case 3:
+            Report("Color is now: GREEN \n\r");
+            break;
+        case 4:
+            Report("Color is now: CYAN \n\r");
+            break;
+        case 5:
+            Report("Color is now: RED \n\r");
+            break;
+        default:
             break;
     }
 }
@@ -260,7 +293,7 @@ char firstLetter(unsigned long value)
             break;
         case B1:
             letter = '*';
-            Report("letter: color, %c \n\r", letter);
+            DisplayColor();
             break;
         case B2:
             letter = 'a';
@@ -320,7 +353,7 @@ char DisplayNextLetter(char l)
             break;
         case '*':
             letter = '*';
-            Report("letter: %c Choose Color \n \r", letter);
+            DisplayColor();
             break;
         case 'a':
             letter = 'b';
@@ -708,22 +741,21 @@ void processSamples()
 void buttonPress()
 {
     char sampleResult = NONE;
-    while (sampleResult == NONE) {
-        MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
-        MAP_TimerEnable(g_ulBase,TIMER_A);
-        sampleReady = 0;
-        while(sampleReady == 0){;}
-        processSamples();
-        sampleResult = ADCDecoder();
-    }
-    data = sampleResult;
-    while (sampleResult != NONE) {
-        MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
-        MAP_TimerEnable(g_ulBase,TIMER_A);
-        sampleReady = 0;
-        while(sampleReady == 0){;}
-        processSamples();
-        sampleResult = ADCDecoder();
+    while(sampleReady == 0){;}
+    processSamples();
+    sampleResult = ADCDecoder();
+
+    if (sampleResult != NONE) {
+        data = sampleResult;
+        dataReady = 1;
+        while (sampleResult != NONE) {
+            MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+            MAP_TimerEnable(g_ulBase,TIMER_A);
+            sampleReady = 0;
+            while(sampleReady == 0){;}
+            processSamples();
+            sampleResult = ADCDecoder();
+        }
     }
 }
 
@@ -812,130 +844,90 @@ int main() {
 
     while (1) {
         buttonPress();
-        DisplayButtonPressed(data);
-        prevData = data;
-        letter = firstLetter(prevData);
-        SW_intflag = 0;
+        if (dataReady) {
+            DisplayButtonPressed(data);
+            prevData = data;
+            letter = firstLetter(prevData);
 
-        if (prevData != B0 && prevData != B1 && prevData != MUTE && prevData != LAST) {
-            uint64_t timeInterval = 0;
-            while (timeInterval++ < 3500000) {
-                // Determines if its the same button
-                buttonPress();
-                if(prevData == data)
-                {
-                    sameButton = 1;
-                    currButton++;
-                }
-                else
-                    sameButton = 0;
+            if (prevData != B0 && prevData != B1 && prevData != MUTE && prevData != LAST) {
+                uint64_t timeInterval = 0;
+                dataReady = 0;
+                while (timeInterval++ < 75) {
+                    MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+                    MAP_TimerEnable(g_ulBase,TIMER_A);
+                    sampleReady = 0;
+                    // Determines if its the same button
+                    buttonPress();
+                    if (dataReady) {
+                        if(prevData == data)
+                        {
+                            sameButton = 1;
+                            currButton++;
+                        }
+                        else
+                            sameButton = 0;
 
-                // Displays Letter
-                if(sameButton)
-                {
-                    letter = DisplayNextLetter(letter);
-                    timeInterval = 0;
+                        // Displays Letter
+                        if(sameButton)
+                        {
+                            letter = DisplayNextLetter(letter);
+                            timeInterval = 0;
+                            dataReady = 0;
+                        }
+                        else
+                        {
+                            dataReady = 1;
+                            break;
+                        }
+                    }
                 }
-                else
-                {
-                    SW_intflag = 1;
-                    break;
-                }
-                SW_intflag = 0;
             }
+            else {
+                dataReady = 0;
+            }
+
+            // Returns the Button Selected if there are Consecutive Presses
+            if(letter != '*')
+                Report("letter %c selected \n\r", letter);
+
+            // Prints full String
+            if (letter == '+') {
+                Report("String: %s \n\r", buffer);
+                int i=0;
+                for(i = 0; i < bufIndex; i++)
+                {
+                    if(buffer[i] != '*')
+                        Report("String: %c \n\r", buffer[i]);
+                    MAP_UARTCharPut(UARTA1_BASE, buffer[i]);
+                }
+                bufIndex = 0;
+                MAP_UARTCharPut(UARTA1_BASE, '=');
+                // Resets Buffer
+                for (i = 0; i < 64; i++) {
+                    buffer[i] = '\0';
+                }
+            } // Deletes Last Letter
+            else if (letter == '-') {
+                if (bufIndex > 0) {
+                    buffer[--bufIndex] = '\0';
+                    buffer[--bufIndex] = '\0';
+                }
+            } // Sets New Letter
+            else {
+                if(letter != '*')
+                {
+                    buffer[bufIndex++] = letter;
+                    buffer[bufIndex++] = color;
+                }
+            }
+
+            // Saves New Button Information
+            prevButton = currButton;
         }
-
-        // Returns the Button Selected if there are Consecutive Presses
-        Report("letter %c selected \n\r", letter);
-
-        // Prints full String
-        if (letter == '+') {
-            Report("String: %s \n\r", buffer);
-            bufIndex = 0;
-            int i;
-            for (i = 0; i < 32; i++) {
-                buffer[i] = '\0';
-            }
-        } // Deletes Last Letter
-        else if (letter == '-') {
-            if (bufIndex > 0) {
-                buffer[--bufIndex] = '\0';
-            }
-        } // Sets New Letter
-        else {
-            buffer[bufIndex++] = letter;
-        }
-
-        // Saves New Button Information
-        prevButton = currButton;
 
         MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
         MAP_TimerEnable(g_ulBase,TIMER_A);
         sampleReady = 0;
-
-
-
-
-
-        /*
-        DisplayButtonPressed(data);
-        prevData = data;
-        letter = firstLetter(prevData);
-        SW_intflag = 0;
-
-        if (prevData != B0 && prevData != B1 && prevData != MUTE && prevData != LAST) {
-            uint64_t timeInterval = 0;
-            while (timeInterval++ < 3500000) {
-                if (SW_intflag) {
-                    // Determines if its the same button
-                    if(prevData == data)
-                    {
-                        sameButton = 1;
-                        currButton++;
-                    }
-                    else
-                        sameButton = 0;
-
-                    // Displays Letter
-                    if(sameButton)
-                    {
-                        letter = DisplayNextLetter(letter);
-                        timeInterval = 0;
-                    }
-                    else
-                    {
-                        SW_intflag = 1;
-                        break;
-                    }
-                    SW_intflag = 0;
-                }
-            }
-        }
-
-        // Returns the Button Selected if there are Consecutive Presses
-        Report("letter %c selected \n\r", letter);
-
-        // Prints full String
-        if (letter == '+') {
-            Report("String: %s \n\r", buffer);
-            bufIndex = 0;
-            int i;
-            for (i = 0; i < 32; i++) {
-                buffer[i] = '\0';
-            }
-        } // Deletes Last Letter
-        else if (letter == '-') {
-            if (bufIndex > 0) {
-                buffer[--bufIndex] = '\0';
-            }
-        } // Sets New Letter
-        else {
-            buffer[bufIndex++] = letter;
-        }
-
-        // Saves New Button Information
-        prevButton = currButton;
-        */
 
     }
 }
