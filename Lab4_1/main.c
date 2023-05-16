@@ -672,7 +672,7 @@ char ADCDecoder()
 //    if(power_all[col] >  && power_all[row] > )
 
 
-    if(power_all[col] > 50000 && power_all[row] > 50000)
+    if(power_all[col] > 100000 && power_all[row] > 100000)
     {
         //char button = frequency[row][col-4];
         return frequency[row][col-4];
@@ -703,6 +703,28 @@ void processSamples()
        Report("Frequency: %d \t Strength: %d \t coeff:%d \t Power: %d \n\r", f_tone[i], samples[i], coeff[i], power_all[i]);
     }
     */
+}
+
+void buttonPress()
+{
+    char sampleResult = NONE;
+    while (sampleResult == NONE) {
+        MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+        MAP_TimerEnable(g_ulBase,TIMER_A);
+        sampleReady = 0;
+        while(sampleReady == 0){;}
+        processSamples();
+        sampleResult = ADCDecoder();
+    }
+    data = sampleResult;
+    while (sampleResult != NONE) {
+        MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+        MAP_TimerEnable(g_ulBase,TIMER_A);
+        sampleReady = 0;
+        while(sampleReady == 0){;}
+        processSamples();
+        sampleResult = ADCDecoder();
+    }
 }
 
 //****************************************************************************
@@ -789,31 +811,64 @@ int main() {
     MAP_TimerEnable(g_ulBase,TIMER_A);
 
     while (1) {
-        while(sampleReady == 0){;}
+        buttonPress();
+        DisplayButtonPressed(data);
+        prevData = data;
+        letter = firstLetter(prevData);
+        SW_intflag = 0;
 
-        //int i;
-      /*  for (i = 0; i < 410; i+=20) {
-            Report("Data: %d \n\r", samples[i]);
-        }*/
+        if (prevData != B0 && prevData != B1 && prevData != MUTE && prevData != LAST) {
+            uint64_t timeInterval = 0;
+            while (timeInterval++ < 3500000) {
+                if (SW_intflag) {
+                    // Determines if its the same button
+                    if(prevData == data)
+                    {
+                        sameButton = 1;
+                        currButton++;
+                    }
+                    else
+                        sameButton = 0;
 
-        // Calculate DC offset
-        processSamples();
-
-        char sampleResult = ADCDecoder();
-        Report("Button: %c \n\r", sampleResult);
-        /*
-        if (sampleResult != NONE) {
-            data = sampleResult;
-            while (sampleResult != NONE) {
-                MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
-                MAP_TimerEnable(g_ulBase,TIMER_A);
-                sampleReady = 0;
-                while(sampleReady == 0){;}
-                processSamples();
-                sampleResult = ADCDecoder();
+                    // Displays Letter
+                    if(sameButton)
+                    {
+                        letter = DisplayNextLetter(letter);
+                        timeInterval = 0;
+                    }
+                    else
+                    {
+                        SW_intflag = 1;
+                        break;
+                    }
+                    SW_intflag = 0;
+                }
             }
         }
-        */
+
+        // Returns the Button Selected if there are Consecutive Presses
+        Report("letter %c selected \n\r", letter);
+
+        // Prints full String
+        if (letter == '+') {
+            Report("String: %s \n\r", buffer);
+            bufIndex = 0;
+            int i;
+            for (i = 0; i < 32; i++) {
+                buffer[i] = '\0';
+            }
+        } // Deletes Last Letter
+        else if (letter == '-') {
+            if (bufIndex > 0) {
+                buffer[--bufIndex] = '\0';
+            }
+        } // Sets New Letter
+        else {
+            buffer[bufIndex++] = letter;
+        }
+
+        // Saves New Button Information
+        prevButton = currButton;
 
         MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
         MAP_TimerEnable(g_ulBase,TIMER_A);
