@@ -163,7 +163,18 @@ typedef struct PinSetting {
     unsigned int pin;
 } PinSetting;
 
-//static PinSetting button = { .port = GPIOA0_BASE, .pin = 0x80};
+typedef struct CLetter{
+    unsigned int x;
+    unsigned int y;
+    char l;
+    int c;
+} CLetter;
+
+CLetter cbuffer[32];
+int cBufIndex = -1;
+int cx = 0;
+int cy = 70;
+int OLEDColor = WHITE;
 
 //*****************************************************************************
 //                      LOCAL FUNCTION PROTOTYPES
@@ -264,18 +275,28 @@ void DisplayColor(void)
     {
         case 1:
             Report("Color is now: WHITE \n\r");
+            setTextColor(WHITE, BLACK);
+            OLEDColor = WHITE;
             break;
         case 2:
             Report("Color is now: BLUE \n\r");
+            setTextColor(BLUE, BLACK);
+            OLEDColor = BLUE;
             break;
         case 3:
             Report("Color is now: GREEN \n\r");
+            setTextColor(GREEN, BLACK);
+            OLEDColor = GREEN;
             break;
         case 4:
             Report("Color is now: CYAN \n\r");
+            setTextColor(CYAN, BLACK);
+            OLEDColor = CYAN;
             break;
         case 5:
             Report("Color is now: RED \n\r");
+            setTextColor(RED, BLACK);
+            OLEDColor = RED;
             break;
         default:
             break;
@@ -297,34 +318,42 @@ char firstLetter(unsigned long value)
             break;
         case B2:
             letter = 'a';
+            Outstr("a");
             Report("letter: %c \n\r", letter);
             break;
         case B3:
             letter = 'd';
+            Outstr("d");
             Report("letter: %c \n\r", letter);
             break;
         case B4:
             letter = 'g';
+            Outstr("g");
             Report("letter: %c \n\r", letter);
             break;
         case B5:
             letter = 'j';
+            Outstr("j");
             Report("letter: %c \n\r", letter);
             break;
         case B6:
             letter = 'm';
+            Outstr("m");
             Report("letter: %c \n\r", letter);
             break;
         case B7:
             letter = 'p';
+            Outstr("p");
             Report("letter: %c \n\r", letter);
             break;
         case B8:
             letter = 't';
+            Outstr("t");
             Report("letter: %c \n\r", letter);
             break;
         case B9:
             letter = 'w';
+            Outstr("w");
             Report("letter: %c \n\r", letter);
             break;
         case MUTE:
@@ -357,106 +386,132 @@ char DisplayNextLetter(char l)
             break;
         case 'a':
             letter = 'b';
+            Outstr("b");
             Report("letter: %c \n\r", letter);
             break;
         case 'b':
             letter = 'c';
+            Outstr("c");
             Report("letter: %c \n\r", letter);
             break;
         case 'c':
             letter = 'a';
+            Outstr("a");
             Report("letter: %c \n\r", letter);
             break;
         case 'd':
             letter = 'e';
+            Outstr("e");
             Report("letter: %c \n\r", letter);
             break;
         case 'e':
             letter = 'f';
+            Outstr("f");
             Report("letter: %c \n\r", letter);
             break;
         case 'f':
             letter = 'd';
+            Outstr("d");
             Report("letter: %c \n\r", letter);
             break;
         case 'g':
             letter = 'h';
+            Outstr("h");
             Report("letter: %c \n\r", letter);
             break;
         case 'h':
             letter = 'i';
+            Outstr("i");
             Report("letter: %c \n\r", letter);
             break;
         case 'i':
             letter = 'g';
+            Outstr("j");
             Report("letter: %c \n\r", letter);
             break;
         case 'j':
             letter = 'k';
+            Outstr("k");
             Report("letter: %c \n\r", letter);
             break;
         case 'k':
             letter = 'l';
+            Outstr("l");
             Report("letter: %c \n\r", letter);
             break;
         case 'l':
             letter = 'j';
+            Outstr("j");
             Report("letter: %c \n\r", letter);
             break;
         case 'm':
             letter = 'n';
+            Outstr("n");
             Report("letter: %c \n\r", letter);
             break;
         case 'n':
             letter = 'o';
+            Outstr("o");
             Report("letter: %c \n\r", letter);
             break;
         case 'o':
             letter = 'm';
+            Outstr("m");
             Report("letter: %c \n\r", letter);
             break;
         case 'p':
             letter = 'q';
+            Outstr("q");
             Report("letter: %c \n\r", letter);
             break;
         case 'q':
             letter = 'r';
+            Outstr("r");
             Report("letter: %c \n\r", letter);
             break;
         case 'r':
             letter = 's';
+            Outstr("s");
             Report("letter: %c \n\r", letter);
             break;
         case 's':
             letter = 'p';
+            Outstr("t");
             Report("letter: %c \n\r", letter);
             break;
         case 't':
             letter = 'u';
+            Outstr("u");
             Report("letter: %c \n\r", letter);
             break;
         case 'u':
             letter = 'v';
+            Outstr("v");
             Report("letter: %c \n\r", letter);
             break;
         case 'v':
             letter = 't';
+            Outstr("t");
             Report("letter: %c \n\r", letter);
             break;
         case 'w':
             letter = 'x';
+            Outstr("x");
             Report("letter: %c \n\r", letter);
             break;
         case 'x':
             letter = 'y';
+            Outstr("y");
             Report("letter: %c \n\r", letter);
             break;
         case 'y':
             letter = 'z';
+            Outstr("z");
             Report("letter: %c \n\r", letter);
             break;
         case 'z':
             letter = 'w';
+            Outstr("w");
             Report("letter: %c \n\r", letter);
             break;
         case '-':
@@ -623,7 +678,7 @@ static void SPI_Communication(void){
     MAP_SPIEnable(GSPI_BASE);
 
     Adafruit_Init();
-//    delay(100);
+    delay(100);
 }
 /*
 static void GPIOA2IntHandler(void) {    // SW2 handler
@@ -758,7 +813,22 @@ void buttonPress()
         }
     }
 }
+void clearLastChar(void)
+{
+    drawChar(cbuffer[cBufIndex].x, cbuffer[cBufIndex].y, cbuffer[cBufIndex].l, BLACK, BLACK, 1);
+}
 
+void clearMessage(void)
+{
+    int i;
+    for(i = 64; i < 128; i++)
+    {
+        drawFastHLine(0, i, 128, BLACK);
+    }
+    cBufIndex = -1;
+    cx = 0;
+    cy = 70;
+}
 //****************************************************************************
 //
 //! Main function
@@ -825,6 +895,10 @@ int main() {
     Message("\t\t****************************************************\n\r");
     Message("\n\n\n\r");
 
+
+    fillScreen(BLACK);
+    delay(60);
+
     prevData = 1;
     currButton = -2;
     prevButton = -1;
@@ -834,7 +908,6 @@ int main() {
     for (i = 0; i < 8; i++)
       {
         coeff[i] = (2 * cos (2 * M_PI * (f_tone[i] / 16000.0))) * (1 << 14);
-        //Report("%d \n\r", coeff[i]);
       }               // calculate coeff at each frquency - Q15 format
 
     //
@@ -847,9 +920,16 @@ int main() {
         if (dataReady) {
             DisplayButtonPressed(data);
             prevData = data;
+            setCursor(cx, cy);
             letter = firstLetter(prevData);
 
             if (prevData != B0 && prevData != B1 && prevData != MUTE && prevData != LAST) {
+                cbuffer[++cBufIndex].l = letter;
+                cbuffer[cBufIndex].x = cx;
+                cbuffer[cBufIndex].y = cy;
+                cbuffer[cBufIndex].c = color;
+                cx += 6;
+
                 uint64_t timeInterval = 0;
                 dataReady = 0;
                 while (timeInterval++ < 75) {
@@ -870,7 +950,11 @@ int main() {
                         // Displays Letter
                         if(sameButton)
                         {
+                            clearLastChar();
+                            setCursor(cbuffer[cBufIndex].x, cbuffer[cBufIndex].y);
                             letter = DisplayNextLetter(letter);
+                            cbuffer[cBufIndex].l = letter;
+
                             timeInterval = 0;
                             dataReady = 0;
                         }
@@ -892,12 +976,12 @@ int main() {
 
             // Prints full String
             if (letter == '+') {
-                Report("String: %s \n\r", buffer);
+                Report("String: ");
                 int i=0;
                 for(i = 0; i < bufIndex; i++)
                 {
                     if(buffer[i] != '*')
-                        Report("String: %c \n\r", buffer[i]);
+                        Report("%c", buffer[i]);
                     MAP_UARTCharPut(UARTA1_BASE, buffer[i]);
                 }
                 bufIndex = 0;
@@ -906,9 +990,14 @@ int main() {
                 for (i = 0; i < 64; i++) {
                     buffer[i] = '\0';
                 }
+                clearMessage();
             } // Deletes Last Letter
             else if (letter == '-') {
                 if (bufIndex > 0) {
+                    clearLastChar();
+                    cx -= 6;
+                    setCursor(cx, cy);
+                    cBufIndex -= 1;
                     buffer[--bufIndex] = '\0';
                     buffer[--bufIndex] = '\0';
                 }
