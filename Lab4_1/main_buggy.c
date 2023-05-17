@@ -75,8 +75,6 @@ int color = 1;
 #define YELLOW          0xFFE0
 #define WHITE           0xFFFF
 
-int colorset[5] = {WHITE, BLUE, GREEN, CYAN, RED};
-
 char frequency[4][3] = {{'1', '2', '3'},
                         {'4', '5', '6'},
                         {'7', '8', '9'},
@@ -119,12 +117,8 @@ volatile unsigned char SW_intflag;
 volatile int first_edge = 1;
 int start  = 0;
 char  prevLetter = '/';
-char outStr[3];
-volatile unsigned char uart_intflag = 0;
 char buffer[64];
-char receiveBuffer[64];
 int bufIndex = 0;
-int receiveBufIndex = 0;
 volatile unsigned char RxBuffer[2];
 volatile unsigned char TxBuffer[2];
 
@@ -576,21 +570,14 @@ static void SysTickInit(void) {
 void UARTIntHandler(void)
 {
     // Checks Interrupt Status
-    unsigned long ulStatus;
-    ulStatus = MAP_UARTIntStatus(UARTA1_BASE, true);
-
-    //Clears Interrupt
-    MAP_UARTIntClear(UARTA1_BASE, ulStatus);
-
-    while(UARTCharsAvail(UARTA1_BASE))
+    if(0)
     {
-        // Collects Data
-        char character = (char)UARTCharGetNonBlocking(UARTA1_BASE);
-        if (character == '=') {
-            uart_intflag = 1;
-        }
-        else {
-            receiveBuffer[receiveBufIndex++] = character;
+        //Clears Interrupt
+
+        while(UARTCharsAvail(UARTA1_BASE))
+        {
+            // Collects Data
+            long buffer = UARTCharGetNonBlocking(UARTA1_BASE);
         }
     }
 }
@@ -636,8 +623,7 @@ static void SPI_Communication(void){
     MAP_SPIEnable(GSPI_BASE);
 
     Adafruit_Init();
-    delay(40);
-    fillScreen(BLACK);
+//    delay(100);
 }
 /*
 static void GPIOA2IntHandler(void) {    // SW2 handler
@@ -910,6 +896,8 @@ int main() {
                 int i=0;
                 for(i = 0; i < bufIndex; i++)
                 {
+                    if(buffer[i] != '*')
+                        Report("String: %c \n\r", buffer[i]);
                     MAP_UARTCharPut(UARTA1_BASE, buffer[i]);
                 }
                 bufIndex = 0;
@@ -935,26 +923,6 @@ int main() {
 
             // Saves New Button Information
             prevButton = currButton;
-        }
-
-        if (uart_intflag) {
-            Report("%s \n\r", receiveBuffer);
-            fillScreen(BLACK);
-            delay(60);
-            int i;
-            for (i = 0; i < receiveBufIndex; i+=2) {
-                setTextColor(colorset[receiveBuffer[i+1]-1], BLACK);
-                outStr[0] = receiveBuffer[i];
-                Outstr(outStr);
-
-            }
-            setCursor(0,0);
-
-            for (i = 0; i < receiveBufIndex; i++) {
-                receiveBuffer[i] = '\0';
-            }
-            receiveBufIndex = 0;
-            uart_intflag = 0;
         }
 
         MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
