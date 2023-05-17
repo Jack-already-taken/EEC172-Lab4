@@ -47,21 +47,24 @@
 #include "pin_mux_config.h"
 
 
-#define B0      0b00000010111111010000000011111111
-#define B1      0b00000010111111011000000001111111
-#define B2      0b00000010111111010100000010111111
-#define B3      0b00000010111111011100000000111111
-#define B4      0b00000010111111010010000011011111
-#define B5      0b00000010111111011010000001011111
-#define B6      0b00000010111111010110000010011111
-#define B7      0b00000010111111011110000000011111
-#define B8      0b00000010111111010001000011101111
-#define B9      0b00000010111111011001000001101111
-#define MUTE    0b00000010111111010000100011110111
-#define LAST    0b00000010111111010000001011111101
+#define B0      '0'
+#define B1      '1'
+#define B2      '2'
+#define B3      '3'
+#define B4      '4'
+#define B5      '5'
+#define B6      '6'
+#define B7      '7'
+#define B8      '8'
+#define B9      '9'
+#define MUTE    '*'
+#define LAST    '#'
+#define NONE    'x'
 
 unsigned long data = 0;
+bool dataReady = 0;
 int track = 0;
+int color = 1;
 
 #define BLACK           0x0000
 #define BLUE            0x001F
@@ -71,6 +74,11 @@ int track = 0;
 #define MAGENTA         0xF81F
 #define YELLOW          0xFFE0
 #define WHITE           0xFFFF
+
+char frequency[4][3] = {{'1', '2', '3'},
+                        {'4', '5', '6'},
+                        {'7', '8', '9'},
+                        {'*', '0', '#'}};
 
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- Start
@@ -109,7 +117,7 @@ volatile unsigned char SW_intflag;
 volatile int first_edge = 1;
 int start  = 0;
 char  prevLetter = '/';
-char buffer[32];
+char buffer[64];
 int bufIndex = 0;
 volatile unsigned char RxBuffer[2];
 volatile unsigned char TxBuffer[2];
@@ -118,10 +126,10 @@ const int N = 410;                 // block size
 volatile int samples[N];   // buffer to store N samples
 volatile int sampleIndex = 0;
 volatile int count;         // samples count
-volatile bool sampleReady;         // flag set when the samples buffer is full with N samples
+volatile bool sampleReady = 0;         // flag set when the samples buffer is full with N samples
 volatile bool new_dig;      // flag set when inter-digit interval (pause) is detected
 
-int power_all[8];       // array to store calculated power of 8 frequencies
+uint32_t power_all[8];       // array to store calculated power of 8 frequencies
 
 int coeff[8];           // array to store the calculated coefficients
 int f_tone[8] = { 697, 770, 852, 941, 1209, 1336, 1477, 1633 }; // frequencies of rows & columns
@@ -155,7 +163,18 @@ typedef struct PinSetting {
     unsigned int pin;
 } PinSetting;
 
-static PinSetting button = { .port = GPIOA0_BASE, .pin = 0x80};
+typedef struct CLetter{
+    unsigned int x;
+    unsigned int y;
+    char l;
+    int c;
+} CLetter;
+
+CLetter cbuffer[32];
+int cBufIndex = -1;
+int cx = 0;
+int cy = 70;
+int OLEDColor = WHITE;
 
 //*****************************************************************************
 //                      LOCAL FUNCTION PROTOTYPES
@@ -238,7 +257,48 @@ void DisplayButtonPressed(unsigned long value)
             Report("Mute was pressed. \n\r");
             break;
         default:
-            Report("Error. Data = %d\n\r", data);
+
+            break;
+    }
+}
+
+// Depicts the Color of the Text
+void DisplayColor(void)
+{
+
+    if(color == 5)
+        color = 1;
+    else
+        color++;
+
+    switch(color)
+    {
+        case 1:
+            Report("Color is now: WHITE \n\r");
+            setTextColor(WHITE, BLACK);
+            OLEDColor = WHITE;
+            break;
+        case 2:
+            Report("Color is now: BLUE \n\r");
+            setTextColor(BLUE, BLACK);
+            OLEDColor = BLUE;
+            break;
+        case 3:
+            Report("Color is now: GREEN \n\r");
+            setTextColor(GREEN, BLACK);
+            OLEDColor = GREEN;
+            break;
+        case 4:
+            Report("Color is now: CYAN \n\r");
+            setTextColor(CYAN, BLACK);
+            OLEDColor = CYAN;
+            break;
+        case 5:
+            Report("Color is now: RED \n\r");
+            setTextColor(RED, BLACK);
+            OLEDColor = RED;
+            break;
+        default:
             break;
     }
 }
@@ -254,38 +314,46 @@ char firstLetter(unsigned long value)
             break;
         case B1:
             letter = '*';
-            Report("letter: color, %c \n\r", letter);
+            DisplayColor();
             break;
         case B2:
             letter = 'a';
+            Outstr("a");
             Report("letter: %c \n\r", letter);
             break;
         case B3:
             letter = 'd';
+            Outstr("d");
             Report("letter: %c \n\r", letter);
             break;
         case B4:
             letter = 'g';
+            Outstr("g");
             Report("letter: %c \n\r", letter);
             break;
         case B5:
             letter = 'j';
+            Outstr("j");
             Report("letter: %c \n\r", letter);
             break;
         case B6:
             letter = 'm';
+            Outstr("m");
             Report("letter: %c \n\r", letter);
             break;
         case B7:
             letter = 'p';
+            Outstr("p");
             Report("letter: %c \n\r", letter);
             break;
         case B8:
             letter = 't';
+            Outstr("t");
             Report("letter: %c \n\r", letter);
             break;
         case B9:
             letter = 'w';
+            Outstr("w");
             Report("letter: %c \n\r", letter);
             break;
         case MUTE:
@@ -314,110 +382,136 @@ char DisplayNextLetter(char l)
             break;
         case '*':
             letter = '*';
-            Report("letter: %c Choose Color \n \r", letter);
+            DisplayColor();
             break;
         case 'a':
             letter = 'b';
+            Outstr("b");
             Report("letter: %c \n\r", letter);
             break;
         case 'b':
             letter = 'c';
+            Outstr("c");
             Report("letter: %c \n\r", letter);
             break;
         case 'c':
             letter = 'a';
+            Outstr("a");
             Report("letter: %c \n\r", letter);
             break;
         case 'd':
             letter = 'e';
+            Outstr("e");
             Report("letter: %c \n\r", letter);
             break;
         case 'e':
             letter = 'f';
+            Outstr("f");
             Report("letter: %c \n\r", letter);
             break;
         case 'f':
             letter = 'd';
+            Outstr("d");
             Report("letter: %c \n\r", letter);
             break;
         case 'g':
             letter = 'h';
+            Outstr("h");
             Report("letter: %c \n\r", letter);
             break;
         case 'h':
             letter = 'i';
+            Outstr("i");
             Report("letter: %c \n\r", letter);
             break;
         case 'i':
             letter = 'g';
+            Outstr("j");
             Report("letter: %c \n\r", letter);
             break;
         case 'j':
             letter = 'k';
+            Outstr("k");
             Report("letter: %c \n\r", letter);
             break;
         case 'k':
             letter = 'l';
+            Outstr("l");
             Report("letter: %c \n\r", letter);
             break;
         case 'l':
             letter = 'j';
+            Outstr("j");
             Report("letter: %c \n\r", letter);
             break;
         case 'm':
             letter = 'n';
+            Outstr("n");
             Report("letter: %c \n\r", letter);
             break;
         case 'n':
             letter = 'o';
+            Outstr("o");
             Report("letter: %c \n\r", letter);
             break;
         case 'o':
             letter = 'm';
+            Outstr("m");
             Report("letter: %c \n\r", letter);
             break;
         case 'p':
             letter = 'q';
+            Outstr("q");
             Report("letter: %c \n\r", letter);
             break;
         case 'q':
             letter = 'r';
+            Outstr("r");
             Report("letter: %c \n\r", letter);
             break;
         case 'r':
             letter = 's';
+            Outstr("s");
             Report("letter: %c \n\r", letter);
             break;
         case 's':
             letter = 'p';
+            Outstr("t");
             Report("letter: %c \n\r", letter);
             break;
         case 't':
             letter = 'u';
+            Outstr("u");
             Report("letter: %c \n\r", letter);
             break;
         case 'u':
             letter = 'v';
+            Outstr("v");
             Report("letter: %c \n\r", letter);
             break;
         case 'v':
             letter = 't';
+            Outstr("t");
             Report("letter: %c \n\r", letter);
             break;
         case 'w':
             letter = 'x';
+            Outstr("x");
             Report("letter: %c \n\r", letter);
             break;
         case 'x':
             letter = 'y';
+            Outstr("y");
             Report("letter: %c \n\r", letter);
             break;
         case 'y':
             letter = 'z';
+            Outstr("z");
             Report("letter: %c \n\r", letter);
             break;
         case 'z':
             letter = 'w';
+            Outstr("w");
             Report("letter: %c \n\r", letter);
             break;
         case '-':
@@ -442,16 +536,16 @@ void TimerBaseIntHandler(void)
     //
     Timer_IF_InterruptClear(g_ulBase);
     // CS Low
-    GPIOPinWrite(GPIOA2_BASE, 0x80, 0);
+    GPIOPinWrite(GPIOA0_BASE, 0x80, 0);
 
     MAP_SPITransfer(GSPI_BASE, TxBuffer, RxBuffer, 2, SPI_CS_ENABLE|SPI_CS_DISABLE);
     // CS High
-    GPIOPinWrite(GPIOA2_BASE, 0x80, 0);
+    GPIOPinWrite(GPIOA0_BASE, 0x80, 0x80);
 
     // Process Data
-    uint16_t data = RxBuffer[1];
+    uint16_t data = RxBuffer[0];
     data = data << 8;
-    data = data | RxBuffer[0];
+    data = data | RxBuffer[1];
     data = data & 0x1FF8;
     data = data >> 3;
     samples[sampleIndex++] = data;
@@ -584,9 +678,9 @@ static void SPI_Communication(void){
     MAP_SPIEnable(GSPI_BASE);
 
     Adafruit_Init();
-//    delay(100);
+    delay(100);
 }
-
+/*
 static void GPIOA2IntHandler(void) {    // SW2 handler
 
     if (first_edge) {
@@ -638,12 +732,109 @@ static void GPIOA2IntHandler(void) {    // SW2 handler
     MAP_GPIOIntClear(button.port, ulStatus);       // clear interrupts on GPIOA2
 
 }
+*/
+char ADCDecoder()
+{
+    int maxPower = 0;
+    int i, row = 0, col = 0;
+    for(i = 0; i < 4; i++)
+    {
+        if(power_all[i] > maxPower)
+        {
+            maxPower = power_all[i];
+            row = i;
+        }
+    }
+
+    maxPower = 0;
+
+    for(i = 4; i < 7; i++)
+    {
+        if(power_all[i] > maxPower)
+        {
+            maxPower = power_all[i];
+            col = i;
+        }
+    }
+
+//    if(power_all[col] >  && power_all[row] > )
+
+
+    if(power_all[col] > 100000 && power_all[row] > 100000)
+    {
+        //char button = frequency[row][col-4];
+        return frequency[row][col-4];
+        //return button;
+    }
+    else {
+        return NONE;
+    }
+}
+
+void processSamples()
+{
+    int sum = 0, i;
+    for(i = 0; i < 410; i++){
+        sum += samples[i];
+    }
+    sum = sum / 410;
+
+    for(i = 0; i < 410; i++)
+    {
+        samples[i] = samples[i] - sum;
+    }
+
+    for(i = 0; i < 8; i++)
+        power_all[i] = goertzel(samples, coeff[i], 410);
+    /*
+    for (i = 0; i < 8; i++) {
+       Report("Frequency: %d \t Strength: %d \t coeff:%d \t Power: %d \n\r", f_tone[i], samples[i], coeff[i], power_all[i]);
+    }
+    */
+}
+
+void buttonPress()
+{
+    char sampleResult = NONE;
+    while(sampleReady == 0){;}
+    processSamples();
+    sampleResult = ADCDecoder();
+
+    if (sampleResult != NONE) {
+        data = sampleResult;
+        dataReady = 1;
+        while (sampleResult != NONE) {
+            MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+            MAP_TimerEnable(g_ulBase,TIMER_A);
+            sampleReady = 0;
+            while(sampleReady == 0){;}
+            processSamples();
+            sampleResult = ADCDecoder();
+        }
+    }
+}
+void clearLastChar(void)
+{
+    drawChar(cbuffer[cBufIndex].x, cbuffer[cBufIndex].y, cbuffer[cBufIndex].l, BLACK, BLACK, 1);
+}
+
+void clearMessage(void)
+{
+    int i;
+    for(i = 64; i < 128; i++)
+    {
+        drawFastHLine(0, i, 128, BLACK);
+    }
+    cBufIndex = -1;
+    cx = 0;
+    cy = 70;
+}
 //****************************************************************************
 //
 //! Main function
 //!
 //! \param none
-//! 
+//!
 //!
 //! \return None.
 //
@@ -651,22 +842,10 @@ static void GPIOA2IntHandler(void) {    // SW2 handler
 int main() {
 
     BoardInit();
-    
-    PinMuxConfig();
-    
-    UART_Communication();
 
-    g_ulBase = TIMERA0_BASE;
-    //
-    // Configuring the timer
-    //
-    Timer_IF_Init(PRCM_TIMERA0, g_ulBase, TIMER_CFG_PERIODIC, TIMER_A, 0);
-    Timer_IF_IntSetup(g_ulBase, TIMER_A, TimerBaseIntHandler);
-    MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
-    //
-    // Enable the GPT
-    //
-    MAP_TimerEnable(g_ulBase,TIMER_A);
+    PinMuxConfig();
+
+    UART_Communication();
 
     // Initialize UART Terminal
     InitTerm();
@@ -677,9 +856,18 @@ int main() {
     // Set SPI
     SPI_Communication();
 
+    g_ulBase = TIMERA0_BASE;
+    //
+    // Configuring the timer
+    //
+    Timer_IF_Init(PRCM_TIMERA0, g_ulBase, TIMER_CFG_PERIODIC, TIMER_A, 0);
+    Timer_IF_IntSetup(g_ulBase, TIMER_A, TimerBaseIntHandler);
+    MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+
     //
     // Register the interrupt handlers
     //
+    /*
     MAP_GPIOIntRegister(button.port, GPIOA2IntHandler);
 
     //
@@ -698,6 +886,7 @@ int main() {
 
     // Enable SW2 and SW3 interrupts
     MAP_GPIOIntEnable(button.port, button.pin);
+    */
 
     Message("\t\t****************************************************\n\r");
     Message("\t\t\t\tSystick Example\n\r\n\r");
@@ -705,6 +894,10 @@ int main() {
     Message("\t\t to enter press LAST button\n\r");
     Message("\t\t****************************************************\n\r");
     Message("\n\n\n\r");
+
+
+    fillScreen(BLACK);
+    delay(60);
 
     prevData = 1;
     currButton = -2;
@@ -714,84 +907,116 @@ int main() {
     int i;
     for (i = 0; i < 8; i++)
       {
-        coeff[i] = (2 * cos (2 * M_PI * (f_tone[i] / 9615.0))) * (1 << 14);
+        coeff[i] = (2 * cos (2 * M_PI * (f_tone[i] / 16000.0))) * (1 << 14);
       }               // calculate coeff at each frquency - Q15 format
 
-
+    //
+    // Enable the GPT
+    //
+    MAP_TimerEnable(g_ulBase,TIMER_A);
 
     while (1) {
-        while(sampleReady == 0){;}
-        int i;
-        for (i = 0; i < 410; i+=50) {
-            Report("Data: %c \n\r", samples[i]);
+        buttonPress();
+        if (dataReady) {
+            DisplayButtonPressed(data);
+            prevData = data;
+            setCursor(cx, cy);
+            letter = firstLetter(prevData);
+
+            if (prevData != B0 && prevData != B1 && prevData != MUTE && prevData != LAST) {
+                cbuffer[++cBufIndex].l = letter;
+                cbuffer[cBufIndex].x = cx;
+                cbuffer[cBufIndex].y = cy;
+                cbuffer[cBufIndex].c = color;
+                cx += 6;
+
+                uint64_t timeInterval = 0;
+                dataReady = 0;
+                while (timeInterval++ < 75) {
+                    MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+                    MAP_TimerEnable(g_ulBase,TIMER_A);
+                    sampleReady = 0;
+                    // Determines if its the same button
+                    buttonPress();
+                    if (dataReady) {
+                        if(prevData == data)
+                        {
+                            sameButton = 1;
+                            currButton++;
+                        }
+                        else
+                            sameButton = 0;
+
+                        // Displays Letter
+                        if(sameButton)
+                        {
+                            clearLastChar();
+                            setCursor(cbuffer[cBufIndex].x, cbuffer[cBufIndex].y);
+                            letter = DisplayNextLetter(letter);
+                            cbuffer[cBufIndex].l = letter;
+
+                            timeInterval = 0;
+                            dataReady = 0;
+                        }
+                        else
+                        {
+                            dataReady = 1;
+                            break;
+                        }
+                    }
+                }
+            }
+            else {
+                dataReady = 0;
+            }
+
+            // Returns the Button Selected if there are Consecutive Presses
+            if(letter != '*')
+                Report("letter %c selected \n\r", letter);
+
+            // Prints full String
+            if (letter == '+') {
+                Report("String: ");
+                int i=0;
+                for(i = 0; i < bufIndex; i++)
+                {
+                    if(buffer[i] != '*')
+                        Report("%c", buffer[i]);
+                    MAP_UARTCharPut(UARTA1_BASE, buffer[i]);
+                }
+                bufIndex = 0;
+                MAP_UARTCharPut(UARTA1_BASE, '=');
+                // Resets Buffer
+                for (i = 0; i < 64; i++) {
+                    buffer[i] = '\0';
+                }
+                clearMessage();
+            } // Deletes Last Letter
+            else if (letter == '-') {
+                if (bufIndex > 0) {
+                    clearLastChar();
+                    cx -= 6;
+                    setCursor(cx, cy);
+                    cBufIndex -= 1;
+                    buffer[--bufIndex] = '\0';
+                    buffer[--bufIndex] = '\0';
+                }
+            } // Sets New Letter
+            else {
+                if(letter != '*')
+                {
+                    buffer[bufIndex++] = letter;
+                    buffer[bufIndex++] = color;
+                }
+            }
+
+            // Saves New Button Information
+            prevButton = currButton;
         }
 
         MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
+        MAP_TimerEnable(g_ulBase,TIMER_A);
         sampleReady = 0;
-
-
-
-
-
-        /*
-        DisplayButtonPressed(data);
-        prevData = data;
-        letter = firstLetter(prevData);
-        SW_intflag = 0;
-
-        if (prevData != B0 && prevData != B1 && prevData != MUTE && prevData != LAST) {
-            uint64_t timeInterval = 0;
-            while (timeInterval++ < 3500000) {
-                if (SW_intflag) {
-                    // Determines if its the same button
-                    if(prevData == data)
-                    {
-                        sameButton = 1;
-                        currButton++;
-                    }
-                    else
-                        sameButton = 0;
-
-                    // Displays Letter
-                    if(sameButton)
-                    {
-                        letter = DisplayNextLetter(letter);
-                        timeInterval = 0;
-                    }
-                    else
-                    {
-                        SW_intflag = 1;
-                        break;
-                    }
-                    SW_intflag = 0;
-                }
-            }
-        }
-
-        // Returns the Button Selected if there are Consecutive Presses
-        Report("letter %c selected \n\r", letter);
-
-        // Prints full String
-        if (letter == '+') {
-            Report("String: %s \n\r", buffer);
-            bufIndex = 0;
-            int i;
-            for (i = 0; i < 32; i++) {
-                buffer[i] = '\0';
-            }
-        } // Deletes Last Letter
-        else if (letter == '-') {
-            if (bufIndex > 0) {
-                buffer[--bufIndex] = '\0';
-            }
-        } // Sets New Letter
-        else {
-            buffer[bufIndex++] = letter;
-        }
-
-        // Saves New Button Information
-        prevButton = currButton;
-        */
 
     }
 }
