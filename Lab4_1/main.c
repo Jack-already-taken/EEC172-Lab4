@@ -974,6 +974,14 @@ int main() {
             if(letter != '*')
                 Report("letter %c selected \n\r", letter);
 
+            if (letter == ' ') {
+                cbuffer[++cBufIndex].l = letter;
+                cbuffer[cBufIndex].x = cx;
+                cbuffer[cBufIndex].y = cy;
+                cbuffer[cBufIndex].c = color;
+                cx += 6;
+            }
+
             // Prints full String
             if (letter == '+') {
                 Report("String: ");
