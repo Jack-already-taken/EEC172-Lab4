@@ -1,3 +1,6 @@
+// Jack Xiang
+// Anayeli Martinez
+
 
 //*****************************************************************************
 //
@@ -13,6 +16,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <stdbool.h>
+#include <string.h>
 
 // Driverlib includes
 #include "hw_types.h"
@@ -46,7 +50,7 @@
 // Pin configurations
 #include "pin_mux_config.h"
 
-
+// Representation for Each Button
 #define B0      '0'
 #define B1      '1'
 #define B2      '2'
@@ -66,6 +70,7 @@ bool dataReady = 0;
 int track = 0;
 int color = 1;
 
+// Definition of Colors for OLED
 #define BLACK           0x0000
 #define BLUE            0x001F
 #define GREEN           0x07E0
@@ -77,6 +82,7 @@ int color = 1;
 
 int colorset[5] = {WHITE, BLUE, GREEN, CYAN, RED};
 
+// Button Frequency Chart
 char frequency[4][3] = {{'1', '2', '3'},
                         {'4', '5', '6'},
                         {'7', '8', '9'},
@@ -172,6 +178,7 @@ typedef struct PinSetting {
     unsigned int pin;
 } PinSetting;
 
+// Orgnaization for Keeping Track of Each Letters Information
 typedef struct CLetter{
     unsigned int x;
     unsigned int y;
@@ -272,6 +279,7 @@ void DisplayButtonPressed(unsigned long value)
 }
 
 // Depicts the Color of the Text
+//      Changes OLED Color for Next Character (Used for Composing)
 void DisplayColor(void)
 {
 
@@ -312,6 +320,7 @@ void DisplayColor(void)
     }
 }
 
+// Sets First Character for Specified Button
 char firstLetter(unsigned long value)
 {
     char letter;
@@ -380,6 +389,8 @@ char firstLetter(unsigned long value)
     return letter;
 }
 
+// Consecutive Button Presses
+//      Changes Character Accordingly
 char DisplayNextLetter(char l)
 {
     char letter;
@@ -538,6 +549,7 @@ char DisplayNextLetter(char l)
     return letter;
 }
 
+// Used to Gather 410 Samples
 void TimerBaseIntHandler(void)
 {
     //
@@ -631,6 +643,7 @@ static void SysTickInit(void) {
     MAP_SysTickEnable();
 }
 
+// Used to Receive Messages through UART Interface
 void UARTIntHandler(void)
 {
     // Checks Interrupt Status
@@ -653,6 +666,7 @@ void UARTIntHandler(void)
     }
 }
 
+// Configures UART interface
 void UART_Communication(void)
 {
     MAP_UARTConfigSetExpClk(UARTA1_BASE, SYSCLK, UART_BAUD_RATE, (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
@@ -693,66 +707,17 @@ static void SPI_Communication(void){
     //
     MAP_SPIEnable(GSPI_BASE);
 
+    // Enables OLED and Adafruit
     Adafruit_Init();
     delay(100);
 }
-/*
-static void GPIOA2IntHandler(void) {    // SW2 handler
 
-    if (first_edge) {
-        SysTickReset();
-        first_edge = 0;
-    }
-    else {
-        // read the countdown register and compute elapsed cycles
-        uint64_t delta = SYSTICK_RELOAD_VAL - SysTickValueGet();
-
-        // convert elapsed cycles to microseconds
-        uint64_t delta_us = TICKS_TO_US(delta);
-
-        SysTickReset();
-
-        if (delta_us >= 35000)
-        {
-            SW_intcount = 0;
-        }else if (delta_us >= 2500 && delta_us < 35000)
-        { // Finds Start Time
-            data = 0;
-            SW_intcount = 1;
-        }if(delta_us > 1300 && delta_us < 2500)
-        {// Determines 1 bit
-            data = data << 1;
-            data = data + 1;
-        } else if(delta_us < 1300)
-        {// Determines 0 bit
-            data = data << 1;
-        }else if(delta_us > 2500)
-        {
-            data = 0;
-        }
-    }
-
-    SW_intcount++;
-
-
-    // Resets interrupt handle for next button pressed
-    if (SW_intcount == 34) {
-        SW_intcount = 0;
-        first_edge = 1;
-        SW_intflag = 1;
-    }
-
-    unsigned long ulStatus;
-
-    ulStatus = MAP_GPIOIntStatus (button.port, true);
-    MAP_GPIOIntClear(button.port, ulStatus);       // clear interrupts on GPIOA2
-
-}
-*/
+// Depcits which Button is Pressed (Confidence Measurement)
 char ADCDecoder()
 {
     long maxPower = 0;
     int i, row = 0, col = 0;
+    // Depicts which frequency is highest in power to depict row of button
     for(i = 0; i < 4; i++)
     {
         if(power_all[i] - maxPower > 0)
@@ -763,7 +728,7 @@ char ADCDecoder()
     }
 
     maxPower = 0;
-
+    // Depict which frequency is highest in power to depict col of button
     for(i = 4; i < 7; i++)
     {
         if(power_all[i] - maxPower > 0)
@@ -773,9 +738,8 @@ char ADCDecoder()
         }
     }
 
-//    if(power_all[col] >  && power_all[row] > )
-
-
+    // Sets Threshold to distinguish if frequency recieved is background noise instead
+    //      Used to measure confidence level of button
     if(power_all[col] - threshold > 0 && power_all[row] - threshold > 0)
     {
         //char button = frequency[row][col-4];
@@ -787,6 +751,7 @@ char ADCDecoder()
     }
 }
 
+// Gathers the 410 samples and subtracts the DC bias
 void processSamples()
 {
     int sum = 0, i;
@@ -800,22 +765,23 @@ void processSamples()
         samples[i] = samples[i] - sum;
     }
 
+    // Goertzel is performed for each frequency
     for(i = 0; i < 8; i++)
         power_all[i] = goertzel(samples, coeff[i], 410);
-    /*
-    for (i = 0; i < 8; i++) {
-       Report("Frequency: %d \t Strength: %d \t coeff:%d \t Power: %d \n\r", f_tone[i], samples[i], coeff[i], power_all[i]);
-    }
-    */
 }
 
+// Decodes which button is pressed
 void buttonPress()
 {
     char sampleResult = NONE;
     while(sampleReady == 0){;}
+    // Gathers the Samples
     processSamples();
+    // Depicts which Button is Pressed
     sampleResult = ADCDecoder();
 
+    // Keeps track of 3 different samples to help increase confidence level
+    //  of button pressed
     if (sampleResult != prevSampleResult) {
         sampleCount = 0;
         if (sampleResult != NONE) {
@@ -832,6 +798,10 @@ void buttonPress()
         prevSampleResult = 0;
         data = sampleResult;
         dataReady = 1;
+
+        // Looks for Release of Button
+        // Helps prevent accidental consecutive presses or multiple reads of same button
+        //  in one press
         while (sampleCount != 3) {
             MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
             MAP_TimerEnable(g_ulBase,TIMER_A);
@@ -847,17 +817,15 @@ void buttonPress()
             }
         }
         sampleCount = 0;
-        int i;
-        for (i = 0; i < 8; i++) {
-           Report("Frequency: %d \t Strength: %d \t coeff:%d \t Power: %ld \n\r", f_tone[i], samples[i], coeff[i], power_all[i]);
-        }
-    }
 }
+
+// Clears Last Character on OLED (Composing)
 void clearLastChar(void)
 {
     drawChar(cbuffer[cBufIndex].x, cbuffer[cBufIndex].y, cbuffer[cBufIndex].l, BLACK, BLACK, 1);
 }
 
+// Clears Composing Message on OLED
 void clearMessage(void)
 {
     int i;
@@ -870,6 +838,7 @@ void clearMessage(void)
     cy = 70;
 }
 
+// Clears Message Recieved on OLED
 void clearReceive(void)
 {
     int i;
@@ -894,6 +863,7 @@ int main() {
 
     PinMuxConfig();
 
+    // Set UART
     UART_Communication();
 
     // Initialize UART Terminal
@@ -913,30 +883,6 @@ int main() {
     Timer_IF_IntSetup(g_ulBase, TIMER_A, TimerBaseIntHandler);
     MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
 
-    //
-    // Register the interrupt handlers
-    //
-    /*
-    MAP_GPIOIntRegister(button.port, GPIOA2IntHandler);
-
-    //
-    // Configure rising edge interrupts on SW2 and SW3
-    //
-
-    MAP_GPIOIntTypeSet(button.port, button.pin, GPIO_FALLING_EDGE);    // SW2
-
-    unsigned long ulStatus;
-    ulStatus = MAP_GPIOIntStatus(button.port, false);
-    MAP_GPIOIntClear(button.port, ulStatus);           // clear interrupts on GPIOA2
-
-    // clear global variables
-    SW_intcount=0;
-    SW_intflag=0;
-
-    // Enable SW2 and SW3 interrupts
-    MAP_GPIOIntEnable(button.port, button.pin);
-    */
-
     Message("\t\t****************************************************\n\r");
     Message("\t\t\t\tSystick Example\n\r\n\r");
     Message("\t\t to delete press MUTE button\n\r");
@@ -944,7 +890,7 @@ int main() {
     Message("\t\t****************************************************\n\r");
     Message("\n\n\n\r");
 
-
+    // Initializes the Screen for OLED
     fillScreen(BLACK);
     delay(60);
 
@@ -952,7 +898,7 @@ int main() {
     currButton = -2;
     prevButton = -1;
     char letter;
-    //uint64_t delta, delta_us;
+
     int i;
     for (i = 0; i < 8; i++)
       {
@@ -965,26 +911,34 @@ int main() {
     MAP_TimerEnable(g_ulBase,TIMER_A);
 
     while (1) {
+        // Gets Microphone Data
         buttonPress();
+
+        // If Reading of Data is successful
         if (dataReady) {
+
+            // Displays Button Pressed
             DisplayButtonPressed(data);
             prevData = data;
             setCursor(cx, cy);
             letter = firstLetter(prevData);
 
             if (prevData != B0 && prevData != B1 && prevData != MUTE && prevData != LAST) {
+                // Saves New Character Info
                 cbuffer[++cBufIndex].l = letter;
                 cbuffer[cBufIndex].x = cx;
                 cbuffer[cBufIndex].y = cy;
                 cbuffer[cBufIndex].c = color;
                 cx += 6;
 
+                // Sets Timer Interrupt Needed for Consecutive Pressing
                 uint64_t timeInterval = 0;
                 dataReady = 0;
                 while (timeInterval++ < 75) {
                     MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
                     MAP_TimerEnable(g_ulBase,TIMER_A);
                     sampleReady = 0;
+
                     // Determines if its the same button
                     buttonPress();
                     if (dataReady) {
@@ -1008,7 +962,7 @@ int main() {
                             dataReady = 0;
                         }
                         else
-                        {
+                        { // Sets Flag for New Button Press
                             dataReady = 1;
                             break;
                         }
@@ -1069,25 +1023,34 @@ int main() {
             prevButton = currButton;
         }
 
+        // Checks if Message is being Recieved
         if (uart_intflag) {
             Report("%s \n\r", receiveBuffer);
+
+            // Clears Previous Message
             clearReceive();
             delay(60);
             setCursor(0,0);
+
+            // Prints New Message on top Half of OLED
             int i;
             for (i = 0; i < receiveBufIndex; i+=2) {
                 setTextColor(colorset[receiveBuffer[i+1]-1], BLACK);
                 outStr[0] = receiveBuffer[i];
-                Outstr(outStr);
+                Outstr((char*)outStr);
 
             }
 
+            // Resets received Buffer for new Message
             for (i = 0; i < receiveBufIndex; i++) {
                 receiveBuffer[i] = '\0';
             }
             receiveBufIndex = 0;
             uart_intflag = 0;
+
+            // Sets Coordinates and color for Continuing Composing Message
             setCursor(cx, cy);
+            setTextColor(OLEDColor, BLACK);
         }
 
         MAP_TimerLoadSet(g_ulBase,TIMER_A, SYSCLKFREQ / SAMPLINGFREQ);
